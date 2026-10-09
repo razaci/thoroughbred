@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thoroughbred — Lane Racing</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101815;color:#edf1e8;font:14px system-ui,sans-serif}button,select{font:inherit}button{cursor:pointer;border:1px solid #4a6454;border-radius:8px;background:#263c30;color:#f2f3e8;padding:12px 16px}button:hover{background:#36533f}button:disabled{opacity:.4;cursor:default}.app{max-width:1100px;margin:auto;padding:16px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}h1{font-size:24px;margin:0;letter-spacing:2px}small,.muted{color:#a9b5aa}.gold{color:#dec486}.panel{background:#19251e;border:1px solid #34473a;border-radius:12px;padding:14px}.setup{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}select{background:#101a14;color:#fff;border:1px solid #546454;padding:10px;border-radius:7px}.track{position:relative;overflow:hidden;border-radius:12px;border:1px solid #596653;background:#526844}canvas{display:block;width:100%;height:420px}.banner{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:12px;pointer-events:none}.badge{padding:8px 12px;background:#101915e8;border:1px solid #6e785b;border-radius:6px;font-size:12px}.controls{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat strong{display:block;font-size:22px;margin-top:5px}.bar{height:7px;background:#09100b;border-radius:10px;overflow:hidden;margin-top:7px}.bar span{display:block;height:100%;background:#c7b67b;width:100%}.pace{display:flex;gap:6px;margin-top:10px}.pace button{flex:1;padding:12px 4px}.pace .on{background:#bcab76;color:#131b14;border-color:#dac896}.lower{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.horses{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.horse{padding:10px;text-align:left;background:#18291e}.horse.active{border-color:#dec486;box-shadow:inset 0 0 0 1px #dec486}.horse strong{display:block;font-size:13px}.horse small{display:block;margin-top:5px;font-size:11px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:7px 5px;text-align:left;border-bottom:1px solid #334137}th{color:#a9b5aa;font-weight:400}.you{color:#ecd296}.note{line-height:1.6;color:#b6c0b4;margin:8px 0 0}.row{display:flex;justify-content:space-between;gap:10px;align-items:center}#result{display:none;margin-top:12px;border-color:#baa873}#result h2{margin:0 0 8px;font-size:21px}.title{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:#bbc5b6}@media(max-width:650px){.app{padding:10px}h1{font-size:18px}header small{font-size:10px}canvas{height:365px}.controls,.lower{grid-template-columns:1fr}.horses{grid-template-columns:repeat(2,1fr)}.stats strong{font-size:20px}.setup{gap:8px}.setup button{flex:1}.badge{font-size:10px;padding:7px}.panel{padding:12px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><h1>THOROUGHBRED</h1><small>LANE RACING · SIX HORSES · ONE FINISH</small></div><span class="gold" id="season">Meeting 1 / 5</span></header>
+<div class="panel setup">
+<label>Distance <select id="distance"><option value="800">800 m · sprint</option><option value="1200" selected>1,200 m · classic</option><option value="1800">1,800 m · endurance</option></select></label>
+<label>Field <select id="difficulty"><option value="0">Club</option><option value="1" selected>Competitive</option><option value="2">Elite</option></select></label>
+<button id="start">Start race</button><button id="pause" disabled>Pause</button><button id="sound">Sound off</button>
+</div>
+<div class="track">
+<canvas id="track"></canvas>
+<div class="banner"><span class="badge" id="message">Select your horse below. Every horse stays in its own lane.</span><span class="badge" id="clock">0:00.00</span></div>
+</div>
+<div class="controls">
+<div class="panel">
+<div class="stats">
+<div class="stat"><small>POSITION</small><strong id="position">— / 6</strong></div>
+<div class="stat"><small>SPEED</small><strong id="speed">0 km/h</strong></div>
+<div class="stat"><small>REMAINING</small><strong id="remaining">1,200 m</strong></div>
+</div>
+</div>
+<div class="panel">
+<div class="row"><span class="title">Ride your horse</span><span id="energy">Stamina 100%</span></div>
+<div class="bar"><span id="stamina"></span></div>
+<div class="pace">
+<button data-pace="0">1 · Settle</button><button data-pace="1" class="on">2 · Cruise</button><button data-pace="2">3 · Push</button><button data-pace="3">4 · Sprint</button>
+</div>
+</div>
+</div>
+<div class="panel" id="result"></div>
+<div class="lower">
+<div class="panel">
+<div class="row"><span class="title">Choose your thoroughbred</span><span class="muted" id="points">0 points</span></div>
+<div id="horses" class="horses"></div>
+<p class="note">Settle to recover energy. Push to challenge the leaders. Save your sprint for the run home. Use buttons or keys 1–4. Space pauses.</p>
+</div>
+<div class="panel"><div class="title" style="margin-bottom:8px">Live race order</div>
+<table><thead><tr><th>Place</th><th>Horse</th><th>Behind</th><th>Energy</th></tr></thead><tbody id="standings"></tbody></table>
+<p class="note" id="commentary">A five-race meeting. Points: 12, 8, 5, 3, 1, 0. No betting—your decisions determine the performance.</p>
+</div>
+</div>
+</div>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id),canvas=$('track'),ctx=canvas.getContext('2d');
+const horses=[
+{name:'Black Meridian',coat:'#2b2727',silk:'#debf64',speed:17.1,endurance:1.08,accel:2.8,style:'Balanced finisher'},
+{name:'Copper Crown',coat:'#9b5430',silk:'#69b3d1',speed:17.6,endurance:.91,accel:3.3,style:'Fast sprint specialist'},
+{name:'Silver Reserve',coat:'#a5a8a1',silk:'#e4e7d8',speed:16.8,endurance:1.24,accel:2.4,style:'Strong endurance'},
+{name:'Night Harbor',coat:'#453024',silk:'#b599d7',speed:17.2,endurance:1.02,accel:3.0,style:'Quick accelerator'},
+{name:'Red Sovereign',coat:'#733627',silk:'#dc6e69',speed:17.4,endurance:.98,accel:2.7,style:'Aggressive front runner'},
+{name:'Oak Sentinel',coat:'#665043',silk:'#79bda0',speed:16.9,endurance:1.17,accel:2.6,style:'Reliable long-distance'}
+];
+let selected=0,pace=1,runners=[],state='ready',elapsed=0,countdown=0,length=1200,level=1,last=0,paused=false,meeting=1,total=0,finished=0,raceSerial=0;
+let audio=null,sound=false,hoofTimer=0,W=1000,H=420;
+const modeNames=['Settling','Cruising','Pushing','Sprinting'];
+function resetRunners(){runners=horses.map((h,i)=>({...h,i,d:0,v:0,energy:100,time:null,phase:i*1.83,noise:Math.random()*6,plan:.64+Math.random()*.17}));}
+function choose(i){if(state==='racing'||state==='countdown')return;selected=i;document.querySelectorAll('.horse').forEach((b,k)=>b.classList.toggle('active',i===k));renderHUD();}
+horses.forEach((h,i)=>{let b=document.createElement('button');b.className='horse'+(!i?' active':'');b.innerHTML='<strong><span style="color:'+h.silk+'">●</span> '+h.name+'</strong><small>Lane '+(i+1)+' · '+h.style+'</small>';b.onclick=()=>choose(i);$('horses').appendChild(b)});
+function setPace(p){pace=p;document.querySelectorAll('[data-pace]').forEach(b=>b.classList.toggle('on',+b.dataset.pace===p));}
+document.querySelectorAll('[data-pace]').forEach(b=>b.onclick=()=>setPace(+b.dataset.pace));
+function tone(freq,duration,volume=.025){if(!sound||!audio)return;try{const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;o.type='triangle';g.gain.setValueAtTime(volume,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+duration);}catch(e){}}
+$('sound').onclick=()=>{sound=!sound;if(sound){try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();audio.resume()}catch(e){sound=false}}$('sound').textContent=sound?'Sound on':'Sound off';};
+$('start').onclick=()=>{
+if(state==='racing'||state==='countdown')return;
+if(meeting>5){meeting=1;total=0}
+raceSerial++;length=+$('distance').value;level=+$('difficulty').value;resetRunners();state='countdown';countdown=3.2;elapsed=0;finished=0;paused=false;setPace(1);$('result').style.display='none';$('start').disabled=true;$('pause').disabled=false;$('pause').textContent='Pause';$('distance').disabled=true;$('difficulty').disabled=true;renderHUD();
+};
+function togglePause(){if(state!=='racing'&&state!=='countdown')return;paused=!paused;$('pause').textContent=paused?'Resume':'Pause';}
+$('pause').onclick=togglePause;
+window.addEventListener('keydown',e=>{if(/SELECT|INPUT|TEXTAREA/.test(e.target.tagName))return;if(['1','2','3','4'].includes(e.key))setPace(+e.key-1);if(e.code==='Space'){e.preventDefault();togglePause()}});
+$('distance').onchange=()=>{length=+$('distance').value;renderHUD()};
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&!paused&&(state==='racing'||state==='countdown'))togglePause()});
+function order(){return [...runners].sort((a,b)=>a.time!==null&&b.time!==null?a.time-b.time:a.time!==null?-1:b.time!==null?1:b.d-a.d)}
+function update(dt){
+if(paused)return;
+if(state==='countdown'){const before=Math.ceil(countdown);countdown-=dt;if(Math.ceil(countdown)<before)tone(420,.12);if(countdown<=0){state='racing';tone(850,.3)}return}
+if(state!=='racing')return;
+elapsed+=dt;
+for(const r of runners){
+if(r.time!==null)continue;
+let m;
+if(r.i===selected)m=pace;
+else {
+const fraction=r.d/length;
+m=fraction>r.plan&&r.energy>16?3:2;
+if(r.energy<25&&fraction<.78)m=1;
+if(fraction<.15)m=r.i===4?2:1;
+if(r.energy<9)m=0;
+}
+const drains=[-1.7,.28,1.24,3.05];
+r.energy=Math.max(0,Math.min(100,r.energy-drains[m]*dt/r.endurance));
+let factor=[.76,.91,1.035,1.17][m];
+const fatigue=r.energy<30?.71+.29*(r.energy/30):1;
+const variation=1+.012*Math.sin(elapsed*.73+r.noise);
+const opposition=r.i===selected?1:[.971,1.005,1.025][level];
+const target=r.speed*factor*fatigue*variation*opposition;
+r.v+=(target-r.v)*Math.min(1,dt*r.accel*.4);
+const previous=r.d;r.d+=r.v*dt;
+r.phase+=r.v*dt*.51;
+if(r.d>=length){r.time=elapsed-dt+dt*(length-previous)/(r.d-previous);r.d=length;finished++;if(r.i===selected)tone(1000,.35);}
+}
+hoofTimer+=dt;if(hoofTimer>.22){hoofTimer=0;tone(85+Math.random()*25,.055,.015)}
+if(finished===6)finish();
+}
+function finish(){
+state='finished';const ranked=order(),place=ranked.findIndex(r=>r.i===selected),earned=[12,8,5,3,1,0][place];total+=earned;
+const stamp=runners[selected].time;const meetingDone=meeting===5;
+$('result').innerHTML='<h2>'+(['Victory','Second place','Third place','Fourth place','Fifth place','Sixth place'][place])+' · '+horses[selected].name+'</h2><div class="note">Finish time '+stamp.toFixed(2)+' seconds · +'+earned+' points · Meeting total '+total+' / 60'+(meetingDone?'<br>Meeting complete. '+(total>=44?'Outstanding riding.':total>=28?'A competitive meeting.':'Try conserving more stamina before the final sprint.'):'')+'</div>';
+$('result').style.display='block';meeting++;$('start').textContent=meetingDone?'New meeting':'Next race';$('start').disabled=false;$('pause').disabled=true;$('distance').disabled=false;$('difficulty').disabled=false;
+}
+function renderHUD(){
+const r=runners[selected],ranked=order();
+$('season').textContent='Meeting '+Math.min(meeting,5)+' / 5';
+$('points').textContent=total+' points';
+$('position').textContent=(state==='ready'?'—':ranked.findIndex(x=>x.i===selected)+1)+' / 6';
+$('speed').textContent=Math.round(r.v*3.6)+' km/h';$('remaining').textContent=Math.ceil(Math.max(0,length-r.d)).toLocaleString()+' m';
+$('energy').textContent='Stamina '+Math.round(r.energy)+'%';$('stamina').style.width=r.energy+'%';$('stamina').style.background=r.energy<25?'#d58169':'#c7b67b';
+const sec=r.time??elapsed;$('clock').textContent=Math.floor(sec/60)+':'+(sec%60).toFixed(2).padStart(5,'0');
+$('message').textContent=paused?'Race paused':state==='countdown'?'Starting gates · '+Math.max(1,Math.ceil(countdown)):state==='racing'?(r.time!==null?'You crossed the finish. Watching the field finish.':'Lane '+(selected+1)+' · '+modeNames[pace]+(r.energy<20?' · stamina running low':'')):state==='finished'?'Official results · all six horses finished':'Choose a horse. Each has its own lane.';
+$('standings').innerHTML=ranked.map((h,i)=>'<tr class="'+(h.i===selected?'you':'')+'"><td>'+(i+1)+'</td><td>'+h.name+(h.i===selected?' ★':'')+'</td><td>'+(h.time!==null?h.time.toFixed(2)+'s':i===0?'Leader':(ranked[0].d-h.d).toFixed(1)+'m')+'</td><td>'+Math.round(h.energy)+'%</td></tr>').join('');
+if(state==='racing'){
+const fraction=r.d/length;
+$('commentary').textContent=r.time!==null?'Your finish is recorded. The remaining horses are still racing.':fraction>.82?'The run home. Spend your remaining stamina wisely.':r.energy<25?'Your horse is tiring. Ease the pace to recover.':fraction<.25?'Opening section. Build your pace without emptying the tank.':'Middle section. Watch the field and prepare your finish.';
+}
+}
+function resize(){const rect=canvas.getBoundingClientRect();W=rect.width;H=rect.height;const dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+window.addEventListener('resize',resize);
+function horse(x,y,r,scale){
+ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
+const moving=state==='racing'&&!paused&&r.time===null;
+const phase=moving?r.phase:0,bob=moving?Math.sin(phase*2)*2:0;
+ctx.fillStyle='#0004';ctx.beginPath();ctx.ellipse(0,19,38,7,0,0,Math.PI*2);ctx.fill();
+ctx.translate(0,bob);
+ctx.lineCap='round';
+for(let leg=0;leg<4;leg++){
+const front=leg>1,baseX=front?18:-22,offset=leg%2?Math.PI:0,a=moving?Math.sin(phase+offset+(front?.8:0)):0;
+ctx.strokeStyle=leg%2?'#271e18':r.coat;ctx.lineWidth=5;
+ctx.beginPath();ctx.moveTo(baseX,3);ctx.lineTo(baseX+a*12,13);ctx.lineTo(baseX-a*13,23);ctx.stroke();
+ctx.strokeStyle='#161914';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(baseX-a*13,23);ctx.lineTo(baseX-a*13+5,23);ctx.stroke();
+}
+ctx.strokeStyle='#24201c';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(-32,-6);ctx.quadraticCurveTo(-43,0,-47+Math.sin(phase)*3,9);ctx.stroke();
+ctx.fillStyle=r.coat;ctx.beginPath();ctx.ellipse(-2,-4,32,14,0,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.moveTo(13,-11);ctx.lineTo(23,-32);ctx.lineTo(34,-31);ctx.lineTo(34,-9);ctx.lineTo(25,4);ctx.closePath();ctx.fill();
+ctx.beginPath();ctx.ellipse(36,-30,14,7,.25,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.moveTo(29,-34);ctx.lineTo(30,-44);ctx.lineTo(35,-35);ctx.fill();
+ctx.strokeStyle='#27221e';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(21,-13);ctx.lineTo(25,-29);ctx.stroke();
+ctx.fillStyle='#171c16';ctx.beginPath();ctx.arc(40,-32,1.4,0,Math.PI*2);ctx.fill();
+ctx.fillStyle=r.silk;ctx.fillRect(-15,-15,21,14);ctx.fillStyle='#152319';ctx.font='bold 10px system-ui';ctx.fillText(r.i+1,-8,-4);
+ctx.strokeStyle='#e5d8b8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(46,-27);ctx.lineTo(9,-26);ctx.stroke();
+ctx.strokeStyle='#efe4d0';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-4,-24);ctx.lineTo(4,-9);ctx.lineTo(9,-1);ctx.stroke();
+ctx.strokeStyle=r.silk;ctx.lineWidth=10;ctx.beginPath();ctx.moveTo(-4,-23);ctx.lineTo(9,-33);ctx.stroke();
+ctx.strokeStyle=r.silk;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(9,-31);ctx.lineTo(18,-25);ctx.stroke();
+ctx.fillStyle='#dabd9b';ctx.beginPath();ctx.arc(15,-37,4,0,Math.PI*2);ctx.fill();
+ctx.fillStyle=r.silk;ctx.beginPath();ctx.ellipse(14,-40,6,4,0,Math.PI,Math.PI*2);ctx.fill();
+if(r.i===selected){ctx.fillStyle='#ecd28c';ctx.beginPath();ctx.moveTo(-3,-56);ctx.lineTo(5,-56);ctx.lineTo(1,-49);ctx.fill()}
+ctx.restore();
+}
+function draw(){
+ctx.clearRect(0,0,W,H);
+ctx.fillStyle='#3d5138';ctx.fillRect(0,0,W,H);
+const top=72,laneH=(H-103)/6;
+ctx.fillStyle='#28392b';ctx.fillRect(0,0,W,57);
+for(let i=0;i<W;i+=10){ctx.fillStyle=['#62705a','#777965','#454f45'][Math.floor(i/10)%3];ctx.fillRect(i,39+(i%30)/5,4,6)}
+ctx.strokeStyle='#c6c5aa';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,60);ctx.lineTo(W,60);ctx.moveTo(0,H-20);ctx.lineTo(W,H-20);ctx.stroke();
+const leader=Math.max(...runners.map(r=>r.d)),span=W<650?100:165,viewStart=Math.max(-10,Math.min(length-span+12,leader-span*.74));
+const left=55,usable=W-85,px=usable/span;
+for(let i=0;i<6;i++){
+const y=top+i*laneH;
+ctx.fillStyle=i===selected?'#776746':i%2?'#62583f':'#695f45';ctx.fillRect(0,y,W,laneH);
+ctx.strokeStyle='#aca48755';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,y+laneH);ctx.lineTo(W,y+laneH);ctx.stroke();
+ctx.fillStyle='#e5dcc180';ctx.font='12px system-ui';ctx.fillText(i+1,13,y+laneH*.6);
+}
+ctx.strokeStyle='#d9d2b233';ctx.lineWidth=1;
+for(let d=Math.ceil(viewStart/25)*25;d<=viewStart+span;d+=25){if(d<0||d>length)continue;const x=left+(d-viewStart)*px;ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,H-30);ctx.stroke();ctx.fillStyle='#d6d2bd';ctx.font='10px system-ui';ctx.fillText(d+'m',x+4,H-7)}
+const finishX=left+(length-viewStart)*px;
+if(finishX<W+20){for(let y=top;y<H-30;y+=8)for(let c=0;c<2;c++){ctx.fillStyle=((Math.floor((y-top)/8)+c)%2)?'#182019':'#efeade';ctx.fillRect(finishX+c*7,y,7,8)}ctx.fillStyle='#e9dbac';ctx.font='bold 12px system-ui';ctx.fillText('FINISH',finishX-18,top-7)}
+for(const r of runners){
+const x=left+(r.d-viewStart)*px,y=top+r.i*laneH+laneH*.5+3;
+if(x<-45){ctx.fillStyle=r.silk;ctx.beginPath();ctx.moveTo(32,y);ctx.lineTo(40,y-5);ctx.lineTo(40,y+5);ctx.fill();continue}
+const scale=Math.min(.9,laneH/65,W/590);
+horse(x,y,r,scale);
+if(state==='ready'||state==='countdown'){ctx.strokeStyle='#aaa185';ctx.lineWidth=2;ctx.strokeRect(x-35*scale,y-35*scale,72*scale,60*scale)}
+}
+if(state==='countdown'){
+ctx.fillStyle='#101811d9';ctx.beginPath();ctx.arc(W/2,H/2,43,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ebd391';ctx.textAlign='center';ctx.font='bold 38px system-ui';ctx.fillText(Math.max(1,Math.ceil(countdown)),W/2,H/2+13);ctx.textAlign='left';
+}
+if(paused){ctx.fillStyle='#07100988';ctx.fillRect(0,0,W,H);ctx.fillStyle='#f0e5c4';ctx.textAlign='center';ctx.font='bold 25px system-ui';ctx.fillText('PAUSED',W/2,H/2);ctx.textAlign='left'}
+}
+let hudTimer=0;
+function frame(now){const dt=Math.min(.04,(now-last)/1000||0);last=now;update(dt);draw();hudTimer+=dt;if(hudTimer>.12){renderHUD();hudTimer=0}requestAnimationFrame(frame)}
+resetRunners();resize();renderHUD();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
